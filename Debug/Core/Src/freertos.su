@@ -1,0 +1,10 @@
+../Core/Inc/bno055_stm32.h:20:6:bno055_assignI2C	16	static
+../Core/Inc/bno055_stm32.h:24:6:bno055_delay	16	static
+../Core/Inc/bno055_stm32.h:32:6:bno055_writeData	40	static
+../Core/Inc/bno055_stm32.h:96:6:bno055_readData	24	static
+../Core/Src/freertos.c:137:7:pi_to_pi	16	static
+../Core/Src/freertos.c:159:6:twist_callback	32	static
+../Core/Src/freertos.c:191:6:twist_publish_callback	40	static
+../Core/Src/freertos.c:252:6:MX_FREERTOS_Init	8	static
+../Core/Src/freertos.c:299:6:StartDefaultTask	512	static
+../Core/Src/freertos.c:381:6:imu_task_fn	56	static
