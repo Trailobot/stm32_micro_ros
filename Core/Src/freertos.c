@@ -69,6 +69,10 @@ typedef StaticTask_t osStaticThreadDef_t;
 #define gear_ratio 10
 #define wheel_separation 0.50
 #define wheel_radius 0.1
+
+#define p_imu 1.0  // 0%
+
+uint8_t state_reconnect;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -103,6 +107,7 @@ extern float wheel_angular_velocity_right;
 extern float wheel_angular_velocity_left;
 
 rcl_ret_t rc;
+
 rcl_publisher_t publisher;
 rcl_subscription_t subscriber;
 
@@ -191,6 +196,12 @@ void twist_callback(const void *msgin) {
 void twist_publish_callback(rcl_timer_t * timer, int64_t last_call_time){
 	(void) last_call_time;
 	if (timer != NULL){
+
+
+//		  if(rc != RCL_RET_OK){
+//			  state_reconnect = 1;
+//			  NVIC_SystemReset();
+//		  }
 		// Update the robot position and orientation based on the wheel movements:
 		  diff1 = step_count_right - last_step_count_right;
 		  diff2 = step_count_left - last_step_count_left;
@@ -215,7 +226,7 @@ void twist_publish_callback(rcl_timer_t * timer, int64_t last_call_time){
 
 		  z_yaw = z_yaw + (wheel_angular_velocity_right - wheel_angular_velocity_left) * wheel_radius / wheel_separation;
 
-		  yaw_pos = 0.95 * pi_to_pi(imu_yaw) + 0.05 * pi_to_pi(z_yaw);
+		  yaw_pos =  p_imu * pi_to_pi(imu_yaw) + (1 - p_imu) * pi_to_pi(z_yaw);
 
 		  x_pos = x_pos + cos(yaw_pos) * ((wheel_angular_velocity_right + wheel_angular_velocity_left) * wheel_radius / 2);
 		  y_pos = y_pos + sin(yaw_pos) * ((wheel_angular_velocity_right + wheel_angular_velocity_left) * wheel_radius / 2);
@@ -300,7 +311,6 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
-
 	  // micro-ROS configuration
 	  char test_array[ARRAY_LEN];
 	  memset(test_array,'z',ARRAY_LEN);
@@ -321,6 +331,7 @@ void StartDefaultTask(void *argument)
 
 	  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
 	      printf("Error on default allocators (line %d)\n", __LINE__);
+//	      NVIC_SystemReset();
 	  }
 
 	  // micro-ROS App //
@@ -387,6 +398,10 @@ void imu_task_fn(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	  if(rc != RCL_RET_OK){
+		  state_reconnect = 1;
+		  NVIC_SystemReset();
+	  }
 	  bno055_vector_t v = bno055_getVectorEuler();
 	  imu_yaw = -1.0 * v.x * M_PI /180;
     osDelay(20);
