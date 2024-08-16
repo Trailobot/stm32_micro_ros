@@ -312,8 +312,9 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
 	  // micro-ROS configuration
+	  // micro-ROS configuration
 	  char test_array[ARRAY_LEN];
-	  memset(test_array,'z',ARRAY_LEN);
+	  memset(test_array, 'z', ARRAY_LEN);
 
 	  rmw_uros_set_custom_transport(
 	    true,
@@ -327,49 +328,77 @@ void StartDefaultTask(void *argument)
 	  freeRTOS_allocator.allocate = microros_allocate;
 	  freeRTOS_allocator.deallocate = microros_deallocate;
 	  freeRTOS_allocator.reallocate = microros_reallocate;
-	  freeRTOS_allocator.zero_allocate =  microros_zero_allocate;
+	  freeRTOS_allocator.zero_allocate = microros_zero_allocate;
 
 	  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
-	      printf("Error on default allocators (line %d)\n", __LINE__);
-//	      NVIC_SystemReset();
+	    printf("Error: Failed to set default allocators.\n");
+	    while (1); // Halt execution if allocator setup fails
 	  }
 
-	  // micro-ROS App //
 	  // Initialize micro-ROS allocator
-	  rcl_allocator_t allocator;
-	  allocator = rcl_get_default_allocator();
+	  rcl_allocator_t allocator = rcl_get_default_allocator();
 
 	  // Initialize support object
 	  rclc_support_t support;
-	  rclc_support_init(&support, 0, NULL, &allocator);
+	  if (rclc_support_init(&support, 0, NULL, &allocator) != RCL_RET_OK) {
+		  state_reconnect = 1;
+	    printf("Error: Failed to initialize rclc_support.\n");
+	    while (1); // Halt execution if support initialization fails
+	  }
 
 	  // Create node object
 	  rcl_node_t node;
-	  rclc_node_init_default(&node, "stm32f446re_node", "", &support);
+	  if (rclc_node_init_default(&node, "stm32f446re_node", "", &support) != RCL_RET_OK) {
+		  state_reconnect = 2;
+	    printf("Error: Failed to initialize rclc_node.\n");
+	    while (1); // Halt execution if node initialization fails
+	  }
 
 	  // Create publisher
-	  const char * pub_topic_name = "/position_uros";
-	  const rosidl_message_type_support_t * pub_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3);
-	  rclc_publisher_init_default(&publisher, &node, pub_type_support, pub_topic_name);
+	  const char *pub_topic_name = "/position_uros";
+	  const rosidl_message_type_support_t *pub_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3);
+	  if (rclc_publisher_init_default(&publisher, &node, pub_type_support, pub_topic_name) != RCL_RET_OK) {
+		  state_reconnect = 3;
+	    printf("Error: Failed to initialize publisher.\n");
+	    while (1); // Halt execution if publisher initialization fails
+	  }
 
 	  // Create timer
 	  rcl_timer_t timer;
-	  rclc_timer_init_default(
-			&timer,
-			&support,
-			RCL_MS_TO_NS(20),
-			twist_publish_callback);
+	  if (rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(20), twist_publish_callback) != RCL_RET_OK) {
+		  state_reconnect = 4;
+	    printf("Error: Failed to initialize timer.\n");
+	    while (1); // Halt execution if timer initialization fails
+	  }
 
 	  // Create subscriber
-	  const char * sub_topic_name = "/cmd_vel_out";
-	  const rosidl_message_type_support_t * sub_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist);
-	  rclc_subscription_init_default(&subscriber, &node, sub_type_support, sub_topic_name);
+	  const char *sub_topic_name = "/cmd_vel_out";
+	  const rosidl_message_type_support_t *sub_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist);
+	  if (rclc_subscription_init_default(&subscriber, &node, sub_type_support, sub_topic_name) != RCL_RET_OK) {
+		  state_reconnect = 5;
+	    printf("Error: Failed to initialize subscription.\n");
+	    while (1); // Halt execution if subscription initialization fails
+	  }
 
 	  // Create executor
 	  rclc_executor_t executor = rclc_executor_get_zero_initialized_executor();
-	  rclc_executor_init(&executor, &support.context, 3, &allocator);
-	  rclc_executor_add_timer(&executor, &timer);
-	  rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA);
+	  if (rclc_executor_init(&executor, &support.context, 3, &allocator) != RCL_RET_OK) {
+		  state_reconnect = 6;
+	    printf("Error: Failed to initialize executor.\n");
+	    while (1); // Halt execution if executor initialization fails
+	  }
+
+	  if (rclc_executor_add_timer(&executor, &timer) != RCL_RET_OK) {
+		  state_reconnect = 7;
+	    printf("Error: Failed to add timer to executor.\n");
+	    while (1); // Halt execution if adding timer to executor fails
+	  }
+
+	  if (rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA) != RCL_RET_OK) {
+		  state_reconnect = 8;
+	    printf("Error: Failed to add subscription to executor.\n");
+	    while (1); // Halt execution if adding subscription to executor fails
+	  }
 
 	  // Spin executor to receive messages
 	  rclc_executor_prepare(&executor);
@@ -399,7 +428,10 @@ void imu_task_fn(void *argument)
   for(;;)
   {
 	  if(rc != RCL_RET_OK){
-		  state_reconnect = 1;
+
+		  NVIC_SystemReset();
+	  }
+	  if (state_reconnect != 0){
 		  NVIC_SystemReset();
 	  }
 	  bno055_vector_t v = bno055_getVectorEuler();
