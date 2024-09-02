@@ -330,6 +330,8 @@ void StartDefaultTask(void *argument)
 	  freeRTOS_allocator.reallocate = microros_reallocate;
 	  freeRTOS_allocator.zero_allocate = microros_zero_allocate;
 
+
+
 	  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
 	    printf("Error: Failed to set default allocators.\n");
 	    while (1); // Halt execution if allocator setup fails
@@ -338,13 +340,19 @@ void StartDefaultTask(void *argument)
 	  // Initialize micro-ROS allocator
 	  rcl_allocator_t allocator = rcl_get_default_allocator();
 
-	  // Initialize support object
+
+	  // Initialize support object// Initialize and modify options (Set DOMAIN ID to 10)
+	  rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+	  rcl_init_options_init(&init_options, allocator);
+	  rcl_init_options_set_domain_id(&init_options, 21);	// 21
+
 	  rclc_support_t support;
-	  if (rclc_support_init(&support, 0, NULL, &allocator) != RCL_RET_OK) {
+	  if (rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator) != RCL_RET_OK) {
 		  state_reconnect = 1;
 	    printf("Error: Failed to initialize rclc_support.\n");
 	    while (1); // Halt execution if support initialization fails
 	  }
+
 
 	  // Create node object
 	  rcl_node_t node;
